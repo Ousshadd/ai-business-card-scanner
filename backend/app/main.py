@@ -4,7 +4,7 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"message": "L'API khdama! Oussama t-9der t-bda l'mobile daba."}
+    return {"message": "L'API est opérationnelle ! tu peux maintenant commencer le développement mobile."}
 
 @app.get("/health")
 def health_check():
