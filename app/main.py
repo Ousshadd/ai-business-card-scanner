@@ -36,7 +36,10 @@ app.add_middleware(
 
 # Initialiser les composants
 preprocessor = ImagePreprocessor()
-ocr_engine = OCREngine()
+# utilisation du modèle OCR performant si variable d'environnement ACTIVE_EASYOCR=true
+import os
+use_easy = os.getenv('ACTIVE_EASYOCR', 'false').lower() in ('1','true','yes')
+ocr_engine = OCREngine(use_easyocr=use_easy)
 parser = CardParser()
 
 @app.get("/")

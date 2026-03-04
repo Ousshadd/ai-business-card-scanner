@@ -13,7 +13,11 @@ d'une photo de carte de visite.
 2. **Précision OCR**
    - Tesseract configuré avec plusieurs modes de segmentation (PSM) et liste blanche
    - Passage de secours en très haute résolution si aucun texte détecté
-   - Nettoyage avancé et correction des confusions les plus fréquentes
+   - **Option** : basculer sur EasyOCR (modèle CNN+transformer) en activant
+     la variable d'environnement `ACTIVE_EASYOCR=true`
+- Génération de variantes (inversion, dilatation, rotations) pour multiplier
+  les chances d'une détection propre
+- Calcul de confiance via `image_to_data` pour choisir le meilleur résultat
 
 3. **Format JSON simplifié**
    - L'endpoint principal `/extract` retourne uniquement `nom`, `telephone` et `email`
