@@ -1,8 +1,24 @@
 from pydantic import BaseModel
 from typing import Optional
 
+class MinimalCardData(BaseModel):
+    """Format minimal attendu par l'application mobile d'Oussama"""
+    nom: Optional[str] = None
+    telephone: Optional[str] = None
+    email: Optional[str] = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "nom": "Dupont Jean",
+                "telephone": "+212612345678",
+                "email": "jean.dupont@company.com"
+            }
+        }
+
+
 class CardData(BaseModel):
-    """Modèle de données pour une carte de visite"""
+    """Modèle complet (utilisé en interne / debug)"""
     nom: Optional[str] = None
     prenom: Optional[str] = None
     telephone: Optional[str] = None

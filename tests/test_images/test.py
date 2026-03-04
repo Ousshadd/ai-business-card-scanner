@@ -14,7 +14,12 @@ def test_extract(image_path):
             
         if response.status_code == 200:
             print("✅ Succès!")
-            print(json.dumps(response.json(), indent=2, ensure_ascii=False))
+            result = response.json()
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            # Vérifier que seules les trois clés importantes sont présentes
+            for field in ('nom','telephone','email'):
+                if field not in result:
+                    print(f"⚠️ Champ manquant: {field}")
         else:
             print(f"❌ Erreur {response.status_code}: {response.text}")
             

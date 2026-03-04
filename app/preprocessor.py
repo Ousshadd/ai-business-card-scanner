@@ -38,25 +38,33 @@ class ImagePreprocessor:
             # 2. Convertir en gris
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             
-            # 3. Débruiter
+            # 3. Débruiter (utile sur photos bruitées ou en basse lumière)
             denoised = cv2.fastNlMeansDenoising(gray, h=30)
-            
-            # 4. Améliorer le contraste avec CLAHE
+
+            # 4. Ajustement de gamma / luminosité (mobile souvent sous-exposé)
+            adjusted = ImagePreprocessor._adjust_gamma(denoised)
+
+            # 5. Améliorer le contraste avec CLAHE
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-            enhanced = clahe.apply(denoised)
-            
-            # 5. Seuillage adaptatif (pour texte sur fond varié)
+            enhanced = clahe.apply(adjusted)
+
+            # 6. Détection et correction de flou
+            if ImagePreprocessor._is_blurry(enhanced):
+                logger.info("Image floue détectée, application d'un filtre de netteté")
+                enhanced = ImagePreprocessor._sharpen(enhanced)
+
+            # 7. Seuillage adaptatif (pour texte sur fond varié)
             binary = cv2.adaptiveThreshold(
                 enhanced, 255,
                 cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                 cv2.THRESH_BINARY, 11, 2
             )
-            
-            # 6. Enlever le bruit restant (opérations morphologiques)
+
+            # 8. Enlever le bruit restant (opérations morphologiques)
             kernel = np.ones((1,1), np.uint8)
             cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
-            
-            # 7. Correction d'inclinaison
+
+            # 9. Correction d'inclinaison
             cleaned = ImagePreprocessor._correct_skew(cleaned)
             
             logger.info("Prétraitement terminé avec succès")
@@ -107,7 +115,10 @@ class ImagePreprocessor:
     
     @staticmethod
     def enhance_resolution(image):
-        """Améliore la résolution de l'image"""
+        """Améliore la résolution de l'image
+
+        Utile lorsque l'OCR ne lit pas correctement les petites polices.
+        """
         try:
             # Redimensionner avec interpolation pour meilleure qualité
             height, width = image.shape[:2]
@@ -119,4 +130,36 @@ class ImagePreprocessor:
             )
             return enhanced
         except:
+            return image
+
+    @staticmethod
+    def _adjust_gamma(image, gamma=1.5):
+        """Amplifie l'image pour corriger les photos sombres."""
+        try:
+            invGamma = 1.0 / gamma
+            table = np.array([((i / 255.0) ** invGamma) * 255
+                              for i in np.arange(0, 256)]).astype("uint8")
+            return cv2.LUT(image, table)
+        except Exception:
+            return image
+
+    @staticmethod
+    def _is_blurry(image, thresh=100.0):
+        """Retourne True si l'image semble floue (variance du Laplacien faible)."""
+        try:
+            lap = cv2.Laplacian(image, cv2.CV_64F)
+            var = lap.var()
+            return var < thresh
+        except Exception:
+            return False
+
+    @staticmethod
+    def _sharpen(image):
+        """Applique un filtre de netteté simple."""
+        kernel = np.array([[0, -1, 0],
+                           [-1, 5,-1],
+                           [0, -1, 0]])
+        try:
+            return cv2.filter2D(image, -1, kernel)
+        except Exception:
             return image

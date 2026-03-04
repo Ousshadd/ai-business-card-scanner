@@ -6,7 +6,7 @@ import uvicorn
 from typing import Optional
 
 # Importer tes modules
-from app.models import CardData
+from app.models import CardData, MinimalCardData
 from app.preprocessor import ImagePreprocessor
 from app.ocr import OCREngine
 from app.parser import CardParser
@@ -53,7 +53,7 @@ async def health_check():
     """Vérifier que l'API fonctionne"""
     return {"status": "healthy"}
 
-@app.post("/extract", response_model=CardData)
+@app.post("/extract", response_model=MinimalCardData)
 async def extract_card(
     file: UploadFile = File(..., description="Image de la carte de visite")
 ):
@@ -92,8 +92,19 @@ async def extract_card(
         data = parser.parse(text)
         logger.info(f"Données extraites: {data}")
         
-        # 5. Retourner le résultat
-        return CardData(**data)
+        # 5. Construire format minimal pour mobile
+        nom_val = None
+        if data.get('nom') and data.get('prenom'):
+            nom_val = f"{data['prenom']} {data['nom']}"
+        else:
+            nom_val = data.get('nom') or data.get('prenom')
+
+        minimal = {
+            'nom': nom_val,
+            'telephone': data.get('telephone'),
+            'email': data.get('email')
+        }
+        return MinimalCardData(**minimal)
         
     except HTTPException:
         raise
@@ -122,6 +133,17 @@ async def extract_debug(file: UploadFile = File(...)):
         
         # Parsing
         parsed = parser.parse(text)
+        # créer aussi un format minimal
+        nom_val = None
+        if parsed.get('nom') and parsed.get('prenom'):
+            nom_val = f"{parsed['prenom']} {parsed['nom']}"
+        else:
+            nom_val = parsed.get('nom') or parsed.get('prenom')
+        minimal = {
+            'nom': nom_val,
+            'telephone': parsed.get('telephone'),
+            'email': parsed.get('email')
+        }
         
         return {
             "filename": file.filename,
@@ -129,6 +151,7 @@ async def extract_debug(file: UploadFile = File(...)):
             "lignes": lines,
             "nombre_lignes": len(lines),
             "donnees_extraites": parsed,
+            "minimal": minimal,
             "status": "success"
         }
         

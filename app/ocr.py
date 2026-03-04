@@ -2,6 +2,9 @@ import pytesseract
 import re
 import logging
 
+# pour monter en résolution quand Tesseract échoue
+from app.preprocessor import ImagePreprocessor
+
 logger = logging.getLogger(__name__)
 
 class OCREngine:
@@ -14,12 +17,17 @@ class OCREngine:
         # Langues supportées (français + anglais)
         self.langs = 'fra+eng'
         
-        # Différentes configurations de segmentation
+        # Liste de caractères autorisés (améliore précision pour cartes)
+        self.whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@.+-:/&" 
+        
+        # Différentes configurations de segmentation (PSM)
         self.psm_configs = [
             '--oem 3 --psm 6',      # Bloc de texte uniforme
             '--oem 3 --psm 4',      # Texte sur une colonne
             '--oem 3 --psm 3',      # Détection automatique
             '--oem 3 --psm 1',      # Détection avec orientation
+            '--oem 3 --psm 11',     # Texte clairsemé / sparse text
+            '--oem 3 --psm 7',      # Une seule ligne (utile pour tél/email)
         ]
         
     def extract_text(self, image):
@@ -37,14 +45,25 @@ class OCREngine:
             
             # Essayer différentes configurations
             for config in self.psm_configs:
+                cfg = config + f" -c tessedit_char_whitelist={self.whitelist}"
                 text = pytesseract.image_to_string(
                     image,
                     lang=self.langs,
-                    config=config
+                    config=cfg
                 )
-                if text and len(text.strip()) > 10:  # Garder si texte significatif
+                if text and len(text.strip()) > 5:  # Garder si texte significatif
                     all_texts.append(text)
-                    logger.info(f"Configuration {config}: {len(text)} caractères")
+                    logger.info(f"Configuration {config} (whitelist appliquée): {len(text)} caractères")
+            
+            # Si aucun texte significatif, essayer avec résolution augmentée
+            if not all_texts:
+                logger.info("Aucun texte significatif détecté, tentative de suréchantillonnage")
+                try:
+                    hires = ImagePreprocessor.enhance_resolution(image)
+                    text = pytesseract.image_to_string(hires, lang=self.langs, config=f"-c tessedit_char_whitelist={self.whitelist}")
+                    all_texts.append(text)
+                except Exception:
+                    pass
             
             # Prendre le texte le plus long (souvent le meilleur)
             if all_texts:
@@ -55,6 +74,8 @@ class OCREngine:
             
             # Nettoyer le texte
             cleaned_text = self._clean_text(best_text)
+            # Corriger certaines erreurs fréquentes de Tesseract
+            cleaned_text = self._fix_common_mistakes(cleaned_text)
             
             logger.info(f"OCR terminé: {len(cleaned_text)} caractères")
             return cleaned_text
@@ -82,3 +103,20 @@ class OCREngine:
                 cleaned_lines.append(clean_line)
         
         return '\n'.join(cleaned_lines)
+
+    def _fix_common_mistakes(self, text):
+        """Corrige des erreurs classiques (O/0, l/1, etc.)"""
+        if not text:
+            return text
+        subs = {
+            'O': '0',
+            'o': '0',
+            'l': '1',
+            'I': '1',
+            '¡': '1',
+        }
+        for k, v in subs.items():
+            text = text.replace(k, v)
+        # corriger email mal espacés
+        text = text.replace(' at ', '@').replace(' dot ', '.')
+        return text

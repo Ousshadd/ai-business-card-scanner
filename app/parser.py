@@ -48,6 +48,7 @@ class CardParser:
         Returns:
             dict avec les champs identifiés
         """
+        # on récupère toutes les infos pour debug mais l'API principal retournera seulement nom/téléphone/email
         data = {
             'nom': None,
             'prenom': None,
@@ -95,17 +96,13 @@ class CardParser:
                 not any(stop in potential_name.upper() for stop in self.stop_words)):
                 
                 name_parts = potential_name.split()
-                if len(name_parts) == 2:
+                if len(name_parts) >= 2:
                     data['prenom'] = name_parts[0]
-                    data['nom'] = name_parts[1]
+                    data['nom'] = ' '.join(name_parts[1:])
                     logger.info(f"Nom complet trouvé: {data['prenom']} {data['nom']}")
                 elif len(name_parts) == 1:
                     data['nom'] = name_parts[0]
                     logger.info(f"Nom trouvé: {data['nom']}")
-                elif len(name_parts) == 3:  # Prénom + Nom + Nom
-                    data['prenom'] = name_parts[0]
-                    data['nom'] = f"{name_parts[1]} {name_parts[2]}"
-                    logger.info(f"Nom composé trouvé: {data['nom']}")
         
         # 4. Trouver SOCIETE
         for i, line in enumerate(lines):
@@ -148,7 +145,10 @@ class CardParser:
         return data
     
     def _clean_phone(self, phone):
-        """Nettoie le numéro de téléphone"""
+        """Nettoie le numéro de téléphone et corrige les confusions OCR"""
+        # corriger lettres confondues
+        phone = phone.replace('O', '0').replace('o', '0')
+        phone = phone.replace('l', '1').replace('I', '1')
         # Enlever tous les caractères non digits sauf +
         cleaned = re.sub(r'[^\d+]', '', phone)
         
